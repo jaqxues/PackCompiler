@@ -17,7 +17,7 @@ const val PACK_APK = "build/outputs/apk/%s/packimpl-%<s.apk"
 
 class PackCompiler(private val extension: PackCompilerPluginConfig) {
     private val packApkPath = PACK_APK.format(extension.buildType)
-    
+
     fun startCompilation() {
         val manifestFile = createManifestFile()
 
@@ -80,7 +80,7 @@ class PackCompiler(private val extension: PackCompilerPluginConfig) {
 
         maniFestFile.writer().use { writer ->
             for ((k, v) in extension.attributes)
-                writer.write("$k: $v")
+                writer.write("$k: $v\n")
             writer.flush()
         }
 
