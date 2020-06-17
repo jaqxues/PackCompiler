@@ -2,6 +2,7 @@ package com.jaqxues.packcompiler
 
 import java.io.File
 import java.util.*
+import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
 
@@ -18,7 +19,9 @@ fun ZipInputStream.extractCurrentFile(targetPath: String): File {
     return file
 }
 
-val ZipInputStream.entries get() = iterator {
+// fixme: Kotlin Type Inference not working correctly
+@Suppress("RemoveExplicitTypeArguments")
+val ZipInputStream.entries get() = iterator<ZipEntry> {
     while (true) {
         val entry = nextEntry
         yield(entry ?: return@iterator)
