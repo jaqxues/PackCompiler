@@ -11,13 +11,12 @@ import java.util.zip.ZipInputStream
  * Date: 17.06.20 - Time 09:31.
  */
 
-fun ZipInputStream.extractCurrentFile(targetPath: String): File {
-    val file = File(targetPath)
-    file.outputStream().use {
-        copyTo(it, 4096)
+fun ZipInputStream.extractCurrentFile(targetFile: File) =
+    targetFile.also { file ->
+        file.outputStream().use {
+            copyTo(it, 4096)
+        }
     }
-    return file
-}
 
 // fixme: Kotlin Type Inference not working correctly
 @Suppress("RemoveExplicitTypeArguments")

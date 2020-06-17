@@ -12,16 +12,16 @@ import java.io.File
 
 @Suppress("MemberVisibilityCanBePrivate")
 open class PackCompilerPluginExtension {
-    var buildType: String? = null
+    var buildTypes: List<String>? = null
     var attributes: Map<String, Any>? = null
     var jdkPath: String = System.getProperty("java.home")
-    var getJarName: (() -> String)? = null
+    var getJarName: ((PackCompilerPluginConfig) -> String)? = null
     var signConfigFile: File? = null
     var activeConfig: Pair<String, String>? = null
 
     val config get() =
         PackCompilerPluginConfig(
-            buildType ?: throw IllegalStateException("Non-Nullable 'buildType' field was null"),
+            buildTypes ?: throw IllegalStateException("Non-Nullable 'buildType' field was null"),
             attributes ?: throw IllegalStateException("Non-Nullable 'attributes' field was null"),
             jdkPath,
             getJarName ?: throw IllegalStateException("Non-Nullable 'getJarName' field was null"),
@@ -31,24 +31,39 @@ open class PackCompilerPluginExtension {
 }
 
 data class PackCompilerPluginConfig(
-    val buildType: String,
+    val buildTypes: List<String>,
     val attributes: Map<String, Any>,
     val jdkPath: String = System.getProperty("java.home"),
-    val getJarName: () -> String,
+    private val getJarName: (PackCompilerPluginConfig) -> String,
     val signConfigFile: File? = null,
     val activeConfig: Pair<String, String>? = null
-)
+) {
+    val jarName by lazy { getJarName(this) }
+}
 
 class PackCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val extension = project.extensions.create("packCompiler", PackCompilerPluginExtension::class.java)
-        project.task("assemblePack") {
-            it.dependsOn("assemble")
-            it.group = "build"
-            it.description = "Compiles a Pack with the current Pack Configuration"
+        project.afterEvaluate {
+            val conf = extension.config
+            for (buildType in conf.buildTypes) {
+                val buildTypeCap = buildType.capitalize()
+                check(project.tasks.findByName("assemble$buildTypeCap") != null) { "Specified Build Type is not associated with an 'assemble' task! ('$buildType' - 'assemble$buildTypeCap')" }
+                project.task("assemblePack$buildTypeCap") {
+                    it.dependsOn("assemble$buildTypeCap")
+                    it.group = "build"
+                    it.description = "Compiles a Pack with the current Pack Configuration (BuildType: $buildType)"
 
-            it.doLast {
-                PackCompiler(extension.config).startCompilation()
+                    it.doLast {
+                        PackCompiler(conf, buildType, project.buildDir.absolutePath).startCompilation()
+                    }
+                }
+            }
+
+            project.task("assemblePack") { t ->
+                t.dependsOn(*conf.buildTypes.map { "assemblePack${it.capitalize()}" }.toTypedArray())
+                t.group = "build"
+                t.description = "Compiles Packs for all given BuildTypes"
             }
         }
     }
