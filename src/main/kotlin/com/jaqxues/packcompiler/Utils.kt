@@ -1,7 +1,7 @@
 package com.jaqxues.packcompiler
 
 import java.io.File
-import java.util.zip.ZipEntry
+import java.util.*
 import java.util.zip.ZipInputStream
 
 
@@ -18,10 +18,12 @@ fun ZipInputStream.extractCurrentFile(targetPath: String): File {
     return file
 }
 
-val ZipInputStream.entries get() = iterator<ZipEntry> {
-    val entry = nextEntry
-    yield(entry)
-    closeEntry()
+val ZipInputStream.entries get() = iterator {
+    while (true) {
+        val entry = nextEntry
+        yield(entry ?: return@iterator)
+        closeEntry()
+    }
 }
 
 fun executableCommand(path: String, name: String, winExtension: String): String {
@@ -30,4 +32,4 @@ fun executableCommand(path: String, name: String, winExtension: String): String 
     return cmd.absolutePath
 }
 
-val isWindows get() = "win" in System.getProperty("os.name").toLowerCase()
+val isWindows get() = "win" in System.getProperty("os.name").toLowerCase(Locale.ROOT)

@@ -11,11 +11,11 @@ import java.util.zip.ZipInputStream
 const val BUILD_PATH = "build/pack_compiler/"
 const val MANIFEST_FILE_PATH = BUILD_PATH + "manifest.txt"
 const val DEX_FILE_PATH = BUILD_PATH + "classes.dex"
-const val JAR_TARGET_PATH = "build/outputs/packs/"
+const val JAR_TARGET_PATH = "build/outputs/pack/"
 
 const val PACK_APK = "build/outputs/apk/%s/packimpl-%<s.apk"
 
-class PackCompiler(private val extension: PackCompilerPluginExtension) {
+class PackCompiler(private val extension: PackCompilerPluginConfig) {
     private val packApkPath = PACK_APK.format(extension.buildType)
     
     fun startCompilation() {
@@ -41,7 +41,7 @@ class PackCompiler(private val extension: PackCompilerPluginExtension) {
             executableCommand(extension.jdkPath, "bin/jarsigner", "exe"),
             "-tsa", "http://timestamp.digicert.com/",
             "-keystore", signConfig.keyStorePath,
-            "-signedjar", extension.getJarName() + ".jar",
+            "-signedjar", File(JAR_TARGET_PATH, extension.getJarName() + ".jar").absolutePath,
             jarFile.absolutePath,
             signConfig.keyAlias
         )
@@ -89,7 +89,7 @@ class PackCompiler(private val extension: PackCompilerPluginExtension) {
 
     private fun extractDexFile(): File {
         val apkFile = File(packApkPath)
-        check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s)" }
+        check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s) ('${apkFile.absolutePath}')" }
 
         return ZipInputStream(apkFile.inputStream()).use { zipInStream ->
             for (entry in zipInStream.entries) {
