@@ -1,5 +1,8 @@
 package com.jaqxues.packcompiler
 
+import org.gradle.api.Project
+import org.gradle.api.Task
+import org.gradle.jvm.tasks.Jar
 import java.io.File
 import java.util.zip.ZipInputStream
 
@@ -8,99 +11,70 @@ import java.util.zip.ZipInputStream
  * This file was created by Jacques Hoffmann (jaqxues) in the Project PackCompiler.<br>
  * Date: 16.06.20 - Time 20:23.
  */
-const val BUILD_PATH = "pack_compiler/"
-const val MANIFEST_FILE_PATH = BUILD_PATH + "manifest.txt"
-const val DEX_FILE_PATH = BUILD_PATH + "classes.dex"
-const val JAR_TARGET_PATH = "outputs/pack/"
+private const val BUILD_PATH = "pack_compiler/%s/"
+private const val MANIFEST_FILE_PATH = BUILD_PATH + "manifest.txt"
+private const val DEX_FILE_PATH = BUILD_PATH + "classes.dex"
+private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
-const val PACK_APK = "outputs/apk/%s/packimpl-%<s.apk"
+private const val PACK_APK = "outputs/apk/%s/packimpl-%<s.apk"
 
-class PackCompiler(private val extension: PackCompilerPluginConfig, buildType: String, private val buildDir: String) {
+class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, private val buildDir: String) {
     private val packApkPath = PACK_APK.format(buildType)
+    private val buildPath = BUILD_PATH.format(buildType)
+    private val manifestFilePath = MANIFEST_FILE_PATH.format(buildType)
+    private val dexFilePath = DEX_FILE_PATH.format(buildType)
+    private val jarTargetPath = JAR_TARGET_PATH.format(buildType)
 
-    fun startCompilation() {
-        val manifestFile = createManifestFile()
+    private val unsignedJarName get() = File(buildDir, jarTargetPath + "${conf.jarName}_unsigned.jar").absolutePath
+    private val signedJarName get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar").absolutePath
 
-        val jarTarget = File(buildDir, JAR_TARGET_PATH + extension.jarName + ".jar")
-        jarTarget.parentFile.mkdirs()
+    fun configureDexTask(t: Task) {
+        t.doLast {
+            val apkFile = File(buildDir, packApkPath)
+            check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s) ('${apkFile.absolutePath}')" }
 
-        extractDexFile()
+            ZipInputStream(apkFile.inputStream()).use { zipInStream ->
+                for (entry in zipInStream.entries) {
+                    if (entry.isDirectory) continue
+                    if (entry.name != "classes.dex") continue
 
-        val unsignedJarFile = createJarFile(manifestFile)
-
-        val signConfigFile = extension.signConfigFile
-        if (signConfigFile != null) {
-            signOutput(unsignedJarFile, signConfigFile, jarTarget)
-        }
-    }
-
-    private fun signOutput(jarFile: File, signConfigFile: File, jarTargetFile: File) {
-        val signConfig = SignConfigModel.fromFile(signConfigFile)
-        signConfig.checkSignKey()
-        val pb = ProcessBuilder(
-            executableCommand(extension.jdkPath, "bin/jarsigner", "exe"),
-            "-tsa", "http://timestamp.digicert.com/",
-            "-keystore", signConfig.keyStorePath,
-            "-signedjar", jarTargetFile.absolutePath,
-            jarFile.absolutePath,
-            signConfig.keyAlias
-        )
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
-        val process = pb.start()
-        process.outputStream.writer().use { writer ->
-            writer.append(signConfig.keyStorePassword)
-                .append("\n")
-                .append(signConfig.keyPassword)
-                .flush()
-        }
-        if (process.waitFor() != 0)
-            throw IllegalStateException("Could not run the jarsigner command ('${pb.command().joinToString()}')")
-    }
-
-    private fun createJarFile(manifestFile: File): File {
-        val unsignedJarFile = File(buildDir, JAR_TARGET_PATH + extension.jarName + "_unsigned.jar")
-        val pb = ProcessBuilder(
-            executableCommand(extension.jdkPath, "bin/jar", "exe"),
-            "cfm",
-            unsignedJarFile.absolutePath,
-            manifestFile.absolutePath,
-            "-C", File(buildDir, BUILD_PATH).absolutePath,
-            "classes.dex"
-        ).inheritIO()
-        if (pb.start().waitFor() != 0)
-            throw IllegalStateException("Could not run the jar command ('${pb.command().joinToString()}'")
-        return unsignedJarFile
-    }
-
-    private fun createManifestFile(): File {
-        val maniFestFile = File(buildDir, MANIFEST_FILE_PATH)
-        if (!maniFestFile.exists()) {
-            maniFestFile.parentFile.mkdirs()
-            maniFestFile.createNewFile()
-        }
-
-        maniFestFile.writer().use { writer ->
-            for ((k, v) in extension.attributes)
-                writer.write("$k: $v\n")
-            writer.flush()
-        }
-
-        return maniFestFile
-    }
-
-    private fun extractDexFile(): File {
-        val apkFile = File(buildDir, packApkPath)
-        check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s) ('${apkFile.absolutePath}')" }
-
-        return ZipInputStream(apkFile.inputStream()).use { zipInStream ->
-            for (entry in zipInStream.entries) {
-                if (entry.isDirectory) continue
-                if (entry.name != "classes.dex") continue
-
-                // Copy classes.dex file
-                return@use zipInStream.extractCurrentFile(File(buildDir, DEX_FILE_PATH))
+                    // Copy classes.dex file
+                    zipInStream.extractCurrentFile(File(buildDir, dexFilePath))
+                    return@use
+                }
+                throw IllegalStateException("Could not find a 'classes.dex' entry in the specified file (${apkFile.absolutePath})")
             }
-            throw IllegalStateException("Could not find a 'classes.dex' entry in the specified file (${apkFile.absolutePath})")
+        }
+    }
+
+    fun configureJarTask(t: Jar) {
+        t.manifest {
+            it.attributes += conf.attributes
+        }
+        // Remove ".jar" since this is added by the task itself
+        t.archiveBaseName.set(unsignedJarName.dropLast(4))
+
+        t.from(File(buildDir, dexFilePath).absolutePath)
+    }
+
+    fun configureSignTask(t: Task, project: Project) {
+        t.doLast {
+            val signConfig = SignConfigModel.fromFile(conf.signConfigFile!!)
+            signConfig.checkSignKey()
+            check(File(unsignedJarName).exists()) { "File to be signed does not exist ('$unsignedJarName')" }
+
+            // https://ant.apache.org/manual/Tasks/signjar.html
+            project.ant.invokeMethod(
+                "signjar", mapOf(
+                    "jar" to unsignedJarName,
+                    "alias" to signConfig.keyAlias,
+                    "storePass" to signConfig.keyStorePassword,
+                    "keystore" to signConfig.keyStorePath,
+                    "keypass" to signConfig.keyPassword,
+                    "signedJar" to signedJarName,
+                    "tsaurl" to "http://timestamp.digicert.com"
+                )
+            )
         }
     }
 }
