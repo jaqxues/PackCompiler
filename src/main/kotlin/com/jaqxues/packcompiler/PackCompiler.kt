@@ -16,10 +16,13 @@ private const val MANIFEST_FILE_PATH = BUILD_PATH + "manifest.txt"
 private const val DEX_FILE_PATH = BUILD_PATH + "classes.dex"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
-private const val PACK_APK = "outputs/apk/%s/packimpl-%<s.apk"
+private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
 
-class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, private val buildDir: String) {
-    private val packApkPath = PACK_APK.format(buildType)
+class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, project: Project) {
+    private val buildDir = project.buildDir
+    private val projectName = project.name
+
+    private val packApkPath = PACK_APK.format(buildType, projectName)
     private val buildPath = BUILD_PATH.format(buildType)
     private val manifestFilePath = MANIFEST_FILE_PATH.format(buildType)
     private val dexFilePath = DEX_FILE_PATH.format(buildType)

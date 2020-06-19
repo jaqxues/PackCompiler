@@ -22,7 +22,7 @@ class PackCompilerPlugin : Plugin<Project> {
                     "Specified Build Type is not associated with an 'assemble' task! ('$buildType' - 'assemble$buildTypeCap')"
                 }
 
-                val packCompiler = PackCompiler(conf, buildType, project.buildDir.absolutePath)
+                val packCompiler = PackCompiler(conf, buildType, project)
 
                 project.task("extractPackDex$buildTypeCap") { t ->
                     t.dependsOn("assemble$buildTypeCap")
