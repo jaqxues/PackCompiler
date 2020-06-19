@@ -50,6 +50,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         }
     }
 
+    @Suppress("UnstableApiUsage")
     fun configureJarTask(t: Jar) {
         t.manifest {
             it.attributes += conf.attributes
@@ -60,9 +61,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         t.from(File(buildDir, dexFilePath).absolutePath)
     }
 
-    fun configureSignTask(t: Task, project: Project) {
+    fun configureSignTask(t: Task, project: Project, signConfig: SignConfigModel) {
         t.doLast {
-            val signConfig = SignConfigModel.fromFile(conf.signConfigFile!!)
             signConfig.checkSignKey()
             check(File(unsignedJarName).exists()) { "File to be signed does not exist ('$unsignedJarName')" }
 

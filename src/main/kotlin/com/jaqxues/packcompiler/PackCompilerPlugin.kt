@@ -14,9 +14,13 @@ class PackCompilerPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val extension = project.extensions.create("packCompiler", PackCompilerPluginExtension::class.java)
 
+        val appProject = project.rootProject.findProject("app")
+            ?: throw IllegalStateException("Could not find :app project!")
+        val androidExtension = AndroidExtensionWrapper(appProject.extensions.getByName("android"))
+
         project.afterEvaluate {
             val conf = extension.config
-            for (buildType in conf.buildTypes) {
+            for (buildType in androidExtension.buildTypes) {
                 val buildTypeCap = buildType.capitalize()
                 check(project.tasks.findByName("assemble$buildTypeCap") != null) {
                     "Specified Build Type is not associated with an 'assemble' task! ('$buildType' - 'assemble$buildTypeCap')"
@@ -40,13 +44,14 @@ class PackCompilerPlugin : Plugin<Project> {
                     packCompiler.configureJarTask(t)
                 }
 
-                if (conf.signConfigFile != null && conf.signConfigFile.exists()) {
+                val signConfig = androidExtension.getSignConfigsForBuildType(buildType)
+                if (signConfig != null && signConfig.keyAlias != "AndroidDebugKey") {
                     project.task("signPackJar$buildTypeCap") { t ->
                         t.dependsOn("bundlePack$buildTypeCap")
                         t.group = "pack compiler"
                         t.description = "Sign the output JarFile."
 
-                        packCompiler.configureSignTask(t, project)
+                        packCompiler.configureSignTask(t, project, signConfig)
                     }
                 }
             }
