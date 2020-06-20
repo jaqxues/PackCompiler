@@ -1,5 +1,6 @@
 package com.jaqxues.packcompiler
 
+import org.gradle.api.logging.Logger
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -11,6 +12,8 @@ import java.util.zip.ZipInputStream
  */
 
 fun ZipInputStream.extractCurrentFile(targetFile: File) {
+    targetFile.parentFile.mkdirs()
+    targetFile.createNewFile()
     targetFile.outputStream().use {
         copyTo(it, 4096)
     }
@@ -25,3 +28,5 @@ val ZipInputStream.entries get() = iterator<ZipEntry> {
         closeEntry()
     }
 }
+
+lateinit var logger: Logger

@@ -1,8 +1,12 @@
 package com.jaqxues.packcompiler
 
+import com.google.gson.JsonParser
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.jvm.tasks.Jar
+import se.vidstige.jadb.JadbConnection
+import se.vidstige.jadb.JadbDevice
+import se.vidstige.jadb.RemoteFile
 import java.io.File
 import java.util.zip.ZipInputStream
 
@@ -12,7 +16,6 @@ import java.util.zip.ZipInputStream
  * Date: 16.06.20 - Time 20:23.
  */
 private const val BUILD_PATH = "pack_compiler/%s/"
-private const val MANIFEST_FILE_PATH = BUILD_PATH + "manifest.txt"
 private const val DEX_FILE_PATH = BUILD_PATH + "classes.dex"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
@@ -23,13 +26,11 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     private val projectName = project.name
 
     private val packApkPath = PACK_APK.format(buildType, projectName)
-    private val buildPath = BUILD_PATH.format(buildType)
-    private val manifestFilePath = MANIFEST_FILE_PATH.format(buildType)
     private val dexFilePath = DEX_FILE_PATH.format(buildType)
     private val jarTargetPath = JAR_TARGET_PATH.format(buildType)
 
-    private val unsignedJarName get() = File(buildDir, jarTargetPath + "${conf.jarName}_unsigned.jar").absolutePath
-    private val signedJarName get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar").absolutePath
+    val unsignedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}_unsigned.jar")
+    val signedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar")
 
     fun configureDexTask(t: Task) {
         t.doLast {
@@ -56,7 +57,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             it.attributes += conf.attributes
         }
         // Remove ".jar" since this is added by the task itself
-        t.archiveBaseName.set(unsignedJarName.dropLast(4))
+        t.archiveBaseName.set(unsignedJarFile.absolutePath.dropLast(4))
 
         t.from(File(buildDir, dexFilePath).absolutePath)
     }
@@ -64,20 +65,141 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     fun configureSignTask(t: Task, project: Project, signConfig: SignConfigModel) {
         t.doLast {
             signConfig.checkSignKey()
-            check(File(unsignedJarName).exists()) { "File to be signed does not exist ('$unsignedJarName')" }
+            check(unsignedJarFile.exists()) { "File to be signed does not exist ('${unsignedJarFile.absolutePath}')" }
 
             // https://ant.apache.org/manual/Tasks/signjar.html
             project.ant.invokeMethod(
                 "signjar", mapOf(
-                    "jar" to unsignedJarName,
+                    "jar" to unsignedJarFile.absolutePath,
                     "alias" to signConfig.keyAlias,
                     "storePass" to signConfig.keyStorePassword,
                     "keystore" to signConfig.keyStorePath,
                     "keypass" to signConfig.keyPassword,
-                    "signedJar" to signedJarName,
+                    "signedJar" to signedJarFile.absolutePath,
                     "tsaurl" to "http://timestamp.digicert.com"
                 )
             )
         }
+    }
+
+    fun configureAdbPushTask(t: Task, adbExecutable: File, file: File) {
+        t.doLast {
+            val config = conf.adbPushConfig!!
+
+            if (config.deviceConfigFile != null && !config.deviceConfigFile.exists()) {
+                generateAdbConfig(config.deviceConfigFile)
+                throw IllegalStateException("Exiting for you to notice - Please customize the Json at ${config.deviceConfigFile.absolutePath}")
+            }
+
+            // Starting Adb Server
+            val returnCode = try {
+                ProcessBuilder()
+                    .command(adbExecutable.absolutePath, "start-server")
+                    .inheritIO()
+                    .start()
+                    .waitFor()
+            } catch (e: Exception) {
+                throw IllegalStateException("Unable to start the Adb Server", e)
+            }
+
+            if (returnCode != 0)
+                throw IllegalStateException("'adb start-server' returned $returnCode")
+
+            val connection = JadbConnection()
+
+            var deviceDefault = true
+            var emulatorDefault = true
+            val customState = mutableMapOf<String, Boolean>()
+            val customPaths = mutableMapOf<String, String>()
+
+            fun getDefaultForDevice(name: String) = if ("emulator" in name) emulatorDefault else deviceDefault
+
+            config.deviceConfigFile?.let { file ->
+                file.reader().use {
+                    for (el in JsonParser.parseReader(it).asJsonArray) {
+                        val jsonObj = el.asJsonObject
+                        val name = jsonObj.getAsJsonPrimitive("name").asString
+                        var enabled = jsonObj.getAsJsonPrimitive("enabled")?.asBoolean
+
+                        if (enabled != null) {
+                            if (name == "emulator_default") {
+                                emulatorDefault = enabled
+                                continue
+                            } else if (name == "device_default") {
+                                deviceDefault = enabled
+                                continue
+                            }
+
+                            if (enabled != getDefaultForDevice(name)) {
+                                customState[name] = enabled
+                                if (!enabled) continue
+                            }
+                        }
+
+                        enabled = enabled ?: getDefaultForDevice(name)
+
+                        if (!enabled) continue
+
+                        val pushPath = jsonObj.getAsJsonPrimitive("pushPath")?.asString
+                        if (pushPath != null && pushPath != config.defaultPath) {
+                            customPaths[name] = pushPath
+                        }
+                    }
+                }
+            }
+
+            val devs = connection.devices.mapNotNull{ device ->
+                val name = device.serial
+                if (device.state != JadbDevice.State.Device)
+                    return@mapNotNull null
+                val enabled = customState[name] ?: getDefaultForDevice(name)
+                if (!enabled) return@mapNotNull null
+
+                val pushPath = customPaths[name] ?: config.defaultPath
+                val path = File(File(pushPath, config.directory).absolutePath, file.name).absolutePath.replace("\\", "/")
+
+                device.push(file, RemoteFile(path))
+                name
+            }
+
+            println("Pushed to ${devs.size} device(s):")
+            for (name in devs) println("\t* $name")
+        }
+    }
+
+    private fun generateAdbConfig(file: File) {
+        file.parentFile.mkdirs()
+        file.createNewFile()
+        file.writeText(
+            """
+                [
+                  {
+                    "name": "emulator_default",
+                    "enabled": "true"
+                  },
+                  {
+                    "name": "device_default",
+                    "enabled": "true"
+                  },
+                  {
+                    "name": "Get Name via 'adb devices'",
+                    "pushPath": "/sdcard/some_custom_path/",
+                    "enabled": "Allows Enabling AdbPush on a per-device basis"
+
+
+
+
+                    ,"TODO": "Please configure this for your needs!",
+                    "Notices": [
+                      "The path your file will be pushed to is 'pushPath_or_default_path/directory_from_build.gradle/generated_jar_file_name(_unsigned).jar'",
+                      "emulator_default and device_default allow enabling or disabling all emulators or devices at once",
+                      "Both of these values are enabled by default"
+                    ]
+                  }
+                ]
+                """.trimIndent()
+        )
+        logger.warn("\n\nJson Config File was not found! A new Config File was generated, please configure it for your needs.")
+        logger.warn("Path to Json: ${file.absolutePath}\n\n")
     }
 }

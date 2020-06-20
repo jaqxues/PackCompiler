@@ -12,8 +12,9 @@ import org.gradle.jvm.tasks.Jar
 class PackCompilerPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
-        val extension = project.extensions.create("packCompiler", PackCompilerPluginExtension::class.java)
+        logger = project.logger
 
+        val extension = project.extensions.create("packCompiler", PackCompilerPluginExtension::class.java)
         val appProject = project.rootProject.findProject("app")
             ?: throw IllegalStateException("Could not find :app project!")
         val androidExtension = AndroidExtensionWrapper(appProject.extensions.getByName("android"))
@@ -45,13 +46,30 @@ class PackCompilerPlugin : Plugin<Project> {
                 }
 
                 val signConfig = androidExtension.getSignConfigsForBuildType(buildType)
-                if (signConfig != null && signConfig.keyAlias != "AndroidDebugKey") {
+                val shouldSign = signConfig != null && signConfig.keyAlias != "AndroidDebugKey"
+                if (shouldSign) {
                     project.task("signPackJar$buildTypeCap") { t ->
                         t.dependsOn("bundlePack$buildTypeCap")
                         t.group = "pack compiler"
                         t.description = "Sign the output JarFile."
 
-                        packCompiler.configureSignTask(t, project, signConfig)
+                        packCompiler.configureSignTask(t, project, signConfig!!)
+                    }
+                }
+
+                if (conf.adbPushConfig != null) {
+                    project.task("adbPushPack$buildTypeCap") { t ->
+                        val jarFile = if (shouldSign) {
+                            t.dependsOn("signPackJar$buildTypeCap")
+                            packCompiler.signedJarFile
+                        } else {
+                            t.dependsOn("bundlePack$buildTypeCap")
+                            packCompiler.unsignedJarFile
+                        }
+                        t.group = "pack compiler"
+                        t.description = "Generates a Pack and pushes it to connected devices via ADB"
+
+                        packCompiler.configureAdbPushTask(t, androidExtension.adbExecutable, jarFile)
                     }
                 }
             }
