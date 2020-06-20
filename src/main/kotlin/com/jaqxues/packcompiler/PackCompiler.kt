@@ -8,6 +8,7 @@ import se.vidstige.jadb.JadbConnection
 import se.vidstige.jadb.JadbDevice
 import se.vidstige.jadb.RemoteFile
 import java.io.File
+import java.nio.file.Paths
 import java.util.zip.ZipInputStream
 
 
@@ -156,9 +157,15 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
                 if (!enabled) return@mapNotNull null
 
                 val pushPath = customPaths[name] ?: config.defaultPath
-                val path = File(File(pushPath, config.directory).absolutePath, file.name).absolutePath.replace("\\", "/")
+                check(pushPath.startsWith("/")) { "Path must be absolute / start with '/'" }
+                val path = Paths.get(pushPath, config.directory, file.name).toString()
+                    .replace("\\", "/")
 
-                device.push(file, RemoteFile(path))
+                try {
+                    device.push(file, RemoteFile(path))
+                } catch (e: Exception) {
+                    throw IllegalStateException("Could not push file to device $name ('$path')", e)
+                }
                 name
             }
 
@@ -175,26 +182,35 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
                 [
                   {
                     "name": "emulator_default",
-                    "enabled": "true"
+                    "enabled": true
                   },
                   {
                     "name": "device_default",
-                    "enabled": "true"
+                    "enabled": true
                   },
                   {
-                    "name": "Get Name via 'adb devices'",
-                    "pushPath": "/sdcard/some_custom_path/",
-                    "enabled": "Allows Enabling AdbPush on a per-device basis"
-
-
-
-
-                    ,"TODO": "Please configure this for your needs!",
-                    "Notices": [
+                    "name": "r9i23250",
+                    "enabled": true,
+                    "pushPath": "/sdcard/3423_4234/"
+                
+                
+                
+                    ,"TODO": "Read the Notes(!) and configure for your needs",
+                    "Notes": [
+                      "You do NOT need to configure this if default values are enough!",
+                      "If you do not need to configure anything, replace the contents of this file with '[]'",
+                
+                      "Get the 'name' via `adb devices`",
+                      "Allowing custom pushPaths to use device-specific mounts. This is not needed for internal storage",
+                      "'enabled' will allow you to turn adb push off for specific devices",
                       "The path your file will be pushed to is 'pushPath_or_default_path/directory_from_build.gradle/generated_jar_file_name(_unsigned).jar'",
-                      "emulator_default and device_default allow enabling or disabling all emulators or devices at once",
-                      "Both of these values are enabled by default"
-                    ]
+                      "emulator_default and device_default allow enabling or disabling all emulators or devices at once"
+                    ],
+                    "Default Values": {
+                      "emulator_default": true,
+                      "device_default": true,
+                      "pushPath": "/storage/emulated/0/"
+                    }
                   }
                 ]
                 """.trimIndent()
