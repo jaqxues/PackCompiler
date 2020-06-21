@@ -17,6 +17,7 @@ class PackCompilerPlugin : Plugin<Project> {
         val extension = project.extensions.create("packCompiler", PackCompilerPluginExtension::class.java)
         val appProject = project.rootProject.findProject("app")
             ?: throw IllegalStateException("Could not find :app project!")
+        checkProguardRules(appProject)
         val androidExtension = AndroidExtensionWrapper(appProject.extensions.getByName("android"))
 
         project.afterEvaluate {

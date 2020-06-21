@@ -1,5 +1,6 @@
 package com.jaqxues.packcompiler
 
+import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import java.io.File
 import java.util.zip.ZipEntry
@@ -26,6 +27,33 @@ val ZipInputStream.entries get() = iterator<ZipEntry> {
         val entry = nextEntry
         yield(entry ?: return@iterator)
         closeEntry()
+    }
+}
+
+fun checkProguardRules(project: Project) {
+    val file = File(project.buildDir, "pack_compiler/proguard_mappings/current.txt")
+    if (file.exists())
+        return
+
+    file.parentFile.mkdirs()
+    file.createNewFile()
+
+    project.file("proguard-rules.pro").apply {
+        useLines {
+            for (line in it) {
+                if ("# Save Mappings to specified path and reuse mapping so APK - Pack Compatibility won't break" in line)
+                    return
+            }
+        }
+        appendText(
+            "\n\n" +
+            """
+                # Save Mappings to specified path and reuse mapping so APK - Pack Compatibility won't break
+                -printmapping build/pack_compiler/proguard_mappings/current.txt
+                -applymapping build/pack_compiler/proguard_mappings/current.txt
+            """.trimIndent()
+        )
+        logger.warn("Modified Proguard rules for Pack Compatibility!")
     }
 }
 
