@@ -205,8 +205,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
                         return
                 }
             }
-            appendText("\n/$relative\n")
-            logger.error(".gitignore has been modified to include /$relative!")
+            appendText("\n$relative\n")
+            logger.error("$absolutePath has been modified to include /$relative!")
         }
     }
 }
