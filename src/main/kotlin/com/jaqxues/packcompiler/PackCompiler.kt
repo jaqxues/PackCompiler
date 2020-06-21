@@ -88,7 +88,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             val config = conf.adbPushConfig!!
 
             if (config.deviceConfigFile != null && !config.deviceConfigFile.exists()) {
-                generateAdbConfig(config.deviceConfigFile)
+                generateAdbConfig(config.deviceConfigFile, t.project.projectDir)
                 throw IllegalStateException("Exiting for you to notice - Please customize the Json at ${config.deviceConfigFile.absolutePath}")
             }
 
@@ -174,12 +174,12 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         }
     }
 
-    private fun generateAdbConfig(file: File) {
+    private fun generateAdbConfig(file: File, projectDir: File) {
         val parent = file.parentFile
         println(file.absolutePath)
         println(parent.absolutePath)
         if (!parent.exists()) {
-            checkGitIgnore(parent.absoluteFile)
+            checkGitIgnore(parent.absoluteFile, projectDir)
             parent.mkdirs()
         }
         file.createNewFile()
@@ -192,20 +192,21 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         logger.warn("Path to Json: ${file.absolutePath}\n\n")
     }
 
-    private fun checkGitIgnore(file: File) {
-        file.resolveSibling(".gitignore").apply {
+    private fun checkGitIgnore(file: File, projectDir: File) {
+        File(projectDir, ".gitignore").apply {
+            val relative = file.toRelativeString(projectDir)
             if (!exists()) {
                 parentFile.mkdirs()
                 createNewFile()
             }
             bufferedReader().useLines {
                 for (line in it) {
-                    if ("Secrets" in line)
+                    if (relative in line)
                         return
                 }
             }
-            appendText("\n/Secrets\n")
+            appendText("\n/$relative\n")
+            logger.error(".gitignore has been modified to include /$relative!")
         }
-        logger.error(".gitignore has been modified to include /Secrets!")
     }
 }
