@@ -175,47 +175,37 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     }
 
     private fun generateAdbConfig(file: File) {
-        file.parentFile.mkdirs()
+        val parent = file.parentFile
+        println(file.absolutePath)
+        println(parent.absolutePath)
+        if (!parent.exists()) {
+            checkGitIgnore(parent.absoluteFile)
+            parent.mkdirs()
+        }
         file.createNewFile()
-        file.writeText(
-            """
-                [
-                  {
-                    "name": "emulator_default",
-                    "enabled": true
-                  },
-                  {
-                    "name": "device_default",
-                    "enabled": true
-                  },
-                  {
-                    "name": "r9i23250",
-                    "enabled": true,
-                    "pushPath": "/sdcard/3423_4234/"
-                
-                
-                
-                    ,"TODO": "Read the Notes(!) and configure for your needs",
-                    "Notes": [
-                      "You do NOT need to configure this if default values are enough!",
-                      "If you do not need to configure anything, replace the contents of this file with '[]'",
-                
-                      "Get the 'name' via `adb devices`",
-                      "Allowing custom pushPaths to use device-specific mounts. This is not needed for internal storage",
-                      "'enabled' will allow you to turn adb push off for specific devices",
-                      "The path your file will be pushed to is 'pushPath_or_default_path/directory_from_build.gradle/generated_jar_file_name(_unsigned).jar'",
-                      "emulator_default and device_default allow enabling or disabling all emulators or devices at once"
-                    ],
-                    "Default Values": {
-                      "emulator_default": true,
-                      "device_default": true,
-                      "pushPath": "/storage/emulated/0/"
-                    }
-                  }
-                ]
-                """.trimIndent()
-        )
+        this::class.java.classLoader.getResourceAsStream("AdbPushConfig.json")!!.use { input ->
+            file.outputStream().use { output ->
+                input.copyTo(output, 8192)
+            }
+        }
         logger.warn("\n\nJson Config File was not found! A new Config File was generated, please configure it for your needs.")
         logger.warn("Path to Json: ${file.absolutePath}\n\n")
+    }
+
+    private fun checkGitIgnore(file: File) {
+        file.resolveSibling(".gitignore").apply {
+            if (!exists()) {
+                parentFile.mkdirs()
+                createNewFile()
+            }
+            bufferedReader().useLines {
+                for (line in it) {
+                    if ("Secrets" in line)
+                        return
+                }
+            }
+            appendText("\n/Secrets\n")
+        }
+        logger.error(".gitignore has been modified to include /Secrets!")
     }
 }

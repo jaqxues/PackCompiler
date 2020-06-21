@@ -1,0 +1,34 @@
+[
+  {
+    "name": "emulator_default",
+    "enabled": true
+  },
+  {
+    "name": "device_default",
+    "enabled": true
+  },
+  {
+    "name": "r9i23250",
+    "enabled": true,
+    "pushPath": "/sdcard/3423_4234/"
+
+
+
+  ,"TODO": "Read the Notes(!) and configure for your needs",
+    "Notes": [
+      "You do NOT need to configure this if default values are enough!",
+      "If you do not need to configure anything, replace the contents of this file with '[]'",
+
+      "Get the 'name' via `adb devices`",
+      "Allowing custom pushPaths to use device-specific mounts. This is not needed for internal storage",
+      "'enabled' will allow you to turn adb push off for specific devices",
+      "The path your file will be pushed to is 'pushPath_or_default_path/directory_from_build.gradle/generated_jar_file_name(_unsigned).jar'",
+      "emulator_default and device_default allow enabling or disabling all emulators or devices at once"
+    ],
+    "Default Values": {
+      "emulator_default": true,
+      "device_default": true,
+      "pushPath": "/storage/emulated/0/"
+    }
+  }
+]
