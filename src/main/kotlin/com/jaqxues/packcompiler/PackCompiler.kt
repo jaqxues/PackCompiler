@@ -88,7 +88,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             val config = conf.adbPushConfig!!
 
             if (config.deviceConfigFile != null && !config.deviceConfigFile.exists()) {
-                generateAdbConfig(config.deviceConfigFile, t.project.projectDir)
+                generateAdbConfig(config.deviceConfigFile, t.project.rootDir)
                 throw IllegalStateException("Exiting for you to notice - Please customize the Json at ${config.deviceConfigFile.absolutePath}")
             }
 
@@ -174,12 +174,12 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         }
     }
 
-    private fun generateAdbConfig(file: File, projectDir: File) {
+    private fun generateAdbConfig(file: File, rootDir: File) {
         val parent = file.parentFile
         println(file.absolutePath)
         println(parent.absolutePath)
         if (!parent.exists()) {
-            checkGitIgnore(parent.absoluteFile, projectDir)
+            checkGitIgnore(parent, rootDir)
             parent.mkdirs()
         }
         file.createNewFile()
@@ -192,9 +192,9 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         logger.warn("Path to Json: ${file.absolutePath}\n\n")
     }
 
-    private fun checkGitIgnore(file: File, projectDir: File) {
-        File(projectDir, ".gitignore").apply {
-            val relative = file.toRelativeString(projectDir)
+    private fun checkGitIgnore(file: File, rootDir: File) {
+        File(rootDir, ".gitignore").apply {
+            val relative = file.toRelativeString(rootDir)
             if (!exists()) {
                 parentFile.mkdirs()
                 createNewFile()
