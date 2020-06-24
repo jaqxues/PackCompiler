@@ -34,6 +34,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     val signedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar")
 
     fun configureDexTask(t: Task) {
+        t.outputs.file(File(buildDir, dexFilePath))
+
         t.doLast {
             val apkFile = File(buildDir, packApkPath)
             check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s) ('${apkFile.absolutePath}')" }
@@ -64,6 +66,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     }
 
     fun configureSignTask(t: Task, project: Project, signConfig: SignConfigModel) {
+        t.outputs.file(signedJarFile)
+
         t.doLast {
             signConfig.checkSignKey()
             check(unsignedJarFile.exists()) { "File to be signed does not exist ('${unsignedJarFile.absolutePath}')" }
