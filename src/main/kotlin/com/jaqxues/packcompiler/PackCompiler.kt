@@ -88,6 +88,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     }
 
     fun configureAdbPushTask(t: Task, adbExecutable: File, file: File) {
+        t.outputs.file(file)
+
         t.doLast {
             val config = conf.adbPushConfig!!
 
