@@ -35,6 +35,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
 
     fun configureDexTask(t: Task) {
         t.outputs.file(File(buildDir, dexFilePath))
+        t.outputs.upToDateWhen { false }
 
         t.doLast {
             val apkFile = File(buildDir, packApkPath)
@@ -67,6 +68,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
 
     fun configureSignTask(t: Task, project: Project, signConfig: SignConfigModel) {
         t.outputs.file(signedJarFile)
+        t.outputs.upToDateWhen { false }
 
         t.doLast {
             signConfig.checkSignKey()
@@ -89,6 +91,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
 
     fun configureAdbPushTask(t: Task, adbExecutable: File, file: File) {
         t.outputs.file(file)
+        t.outputs.upToDateWhen { false }
 
         t.doLast {
             val config = conf.adbPushConfig!!
