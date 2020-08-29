@@ -44,16 +44,18 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s) ('${apkFile.absolutePath}')" }
 
             ZipInputStream(apkFile.inputStream()).use { zipInStream ->
+                var found = false
                 for (entry in zipInStream.entries) {
-                    if (entry.isDirectory) continue
-                    if (!(entry.name matches CLASSES_DEX_REGEX)) continue
+                    if (entry.isDirectory || !(entry.name matches CLASSES_DEX_REGEX)) continue
+                    found = true
 
                     val dexFile = File(buildDir, dexDir + entry.name)
                     // Copy classes(d).dex file
                     zipInStream.extractCurrentFile(dexFile)
-                    return@use
                 }
-                throw IllegalStateException("Could not find a 'classes.dex' entry in the specified file (${apkFile.absolutePath})")
+
+                if (!found)
+                    throw IllegalStateException("Could not find a single 'classes.dex' entry in the specified file (${apkFile.absolutePath})")
             }
         }
     }

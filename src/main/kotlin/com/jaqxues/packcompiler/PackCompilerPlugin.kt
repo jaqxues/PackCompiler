@@ -30,20 +30,20 @@ class PackCompilerPlugin : Plugin<Project> {
 
                 val packCompiler = PackCompiler(conf, buildType, project)
 
-                val dexFiles = project.task("extractPackDex$buildTypeCap") { t ->
+                project.task("extractPackDex$buildTypeCap") { t ->
                     t.dependsOn("assemble$buildTypeCap")
                     t.group = "pack compiler"
                     t.description = "Extract Dex File(s) from the Dynamic Feature APKs"
 
                     packCompiler.configureDexTask(t)
-                }.outputs.files
+                }
 
                 project.tasks.register("bundlePack$buildTypeCap", Jar::class.java) { t ->
                     t.dependsOn("extractPackDex$buildTypeCap")
                     t.group = "pack compiler"
                     t.description = "Compile the classes.dex and the given manifest to a JarFile"
 
-                    packCompiler.configureJarTask(t, dexFiles)
+                    packCompiler.configureJarTask(t)
                 }
 
                 val signConfig = androidExtension.getSignConfigsForBuildType(buildType)
