@@ -3,6 +3,7 @@ package com.jaqxues.packcompiler
 import com.google.gson.JsonParser
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.file.FileCollection
 import org.gradle.jvm.tasks.Jar
 import se.vidstige.jadb.JadbConnection
 import se.vidstige.jadb.JadbDevice
@@ -17,24 +18,23 @@ import java.util.zip.ZipInputStream
  * Date: 16.06.20 - Time 20:23.
  */
 private const val BUILD_PATH = "pack_compiler/%s/"
-private const val DEX_FILE_PATH = BUILD_PATH + "classes.dex"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
 private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
+private val CLASSES_DEX_REGEX = "classes\\d*\\.dex".toRegex()
 
 class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, project: Project) {
     private val buildDir = project.buildDir
     private val projectName = project.name
 
     private val packApkPath = PACK_APK.format(buildType, projectName)
-    private val dexFilePath = DEX_FILE_PATH.format(buildType)
+    private val packCompilerBuildDir = BUILD_PATH.format(buildType)
     private val jarTargetPath = JAR_TARGET_PATH.format(buildType)
 
     val unsignedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}_unsigned.jar")
     val signedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar")
 
     fun configureDexTask(t: Task) {
-        t.outputs.file(File(buildDir, dexFilePath))
         t.outputs.upToDateWhen { false }
 
         t.doLast {
@@ -44,10 +44,12 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             ZipInputStream(apkFile.inputStream()).use { zipInStream ->
                 for (entry in zipInStream.entries) {
                     if (entry.isDirectory) continue
-                    if (entry.name != "classes.dex") continue
+                    if (!(entry.name matches CLASSES_DEX_REGEX)) continue
 
-                    // Copy classes.dex file
-                    zipInStream.extractCurrentFile(File(buildDir, dexFilePath))
+                    val dexFile = File(buildDir, packCompilerBuildDir + entry.name)
+                    t.outputs.file(dexFile)
+                    // Copy classes(d).dex file
+                    zipInStream.extractCurrentFile(dexFile)
                     return@use
                 }
                 throw IllegalStateException("Could not find a 'classes.dex' entry in the specified file (${apkFile.absolutePath})")
@@ -56,14 +58,17 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     }
 
     @Suppress("UnstableApiUsage")
-    fun configureJarTask(t: Jar) {
+    fun configureJarTask(t: Jar, dexOutputs: FileCollection) {
         t.manifest {
             it.attributes += conf.attributes
         }
         // Remove ".jar" since this is added by the task itself
         t.archiveBaseName.set(unsignedJarFile.absolutePath.dropLast(4))
 
-        t.from(File(buildDir, dexFilePath).absolutePath)
+        dexOutputs.forEach {
+            if (it.name matches CLASSES_DEX_REGEX)
+                t.from(it.absolutePath)
+        }
     }
 
     fun configureSignTask(t: Task, project: Project, signConfig: SignConfigModel) {
