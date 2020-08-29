@@ -18,6 +18,7 @@ import java.util.zip.ZipInputStream
  * Date: 16.06.20 - Time 20:23.
  */
 private const val BUILD_PATH = "pack_compiler/%s/"
+private const val DEX_DIR = BUILD_PATH + "dexes/"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
 private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
@@ -28,13 +29,14 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     private val projectName = project.name
 
     private val packApkPath = PACK_APK.format(buildType, projectName)
-    private val packCompilerBuildDir = BUILD_PATH.format(buildType)
+    private val dexDir = DEX_DIR.format(buildType)
     private val jarTargetPath = JAR_TARGET_PATH.format(buildType)
 
     val unsignedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}_unsigned.jar")
     val signedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar")
 
     fun configureDexTask(t: Task) {
+        t.outputs.dir(dexDir)
         t.outputs.upToDateWhen { false }
 
         t.doLast {
@@ -46,8 +48,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
                     if (entry.isDirectory) continue
                     if (!(entry.name matches CLASSES_DEX_REGEX)) continue
 
-                    val dexFile = File(buildDir, packCompilerBuildDir + entry.name)
-                    t.outputs.file(dexFile)
+                    val dexFile = File(buildDir, dexDir + entry.name)
                     // Copy classes(d).dex file
                     zipInStream.extractCurrentFile(dexFile)
                     return@use
@@ -58,14 +59,14 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     }
 
     @Suppress("UnstableApiUsage")
-    fun configureJarTask(t: Jar, dexOutputs: FileCollection) {
+    fun configureJarTask(t: Jar) {
         t.manifest {
             it.attributes += conf.attributes
         }
         // Remove ".jar" since this is added by the task itself
         t.archiveBaseName.set(unsignedJarFile.absolutePath.dropLast(4))
 
-        dexOutputs.forEach {
+        File(buildDir, dexDir).listFiles()?.forEach {
             if (it.name matches CLASSES_DEX_REGEX)
                 t.from(it.absolutePath)
         }
