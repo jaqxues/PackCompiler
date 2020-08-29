@@ -36,7 +36,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
     val signedJarFile get() = File(buildDir, jarTargetPath + "${conf.jarName}.jar")
 
     fun configureDexTask(t: Task) {
-        t.outputs.dir(dexDir)
+        t.outputs.dir(File(buildDir, dexDir))
         t.outputs.upToDateWhen { false }
 
         t.doLast {
