@@ -133,40 +133,39 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             fun getDefaultForDevice(name: String) = if ("emulator" in name) emulatorDefault else deviceDefault
 
             config.deviceConfigFile?.let { file ->
-                file.reader().use {
-                    for (el in JsonParser.parseReader(it).asJsonArray) {
-                        val jsonObj = el.asJsonObject
-                        val name = jsonObj.getAsJsonPrimitive("name").asString
-                        var enabled = jsonObj.getAsJsonPrimitive("enabled")?.asBoolean
+                for (el in file.reader().use { JsonParser.parseReader(it).asJsonArray }) {
+                    val jsonObj = el.asJsonObject
+                    val name = jsonObj.getAsJsonPrimitive("name").asString
+                    var enabled = jsonObj.getAsJsonPrimitive("enabled")?.asBoolean
 
-                        if (enabled != null) {
-                            if (name == "emulator_default") {
-                                emulatorDefault = enabled
-                                continue
-                            } else if (name == "device_default") {
-                                deviceDefault = enabled
-                                continue
-                            }
-
-                            if (enabled != getDefaultForDevice(name)) {
-                                customState[name] = enabled
-                                if (!enabled) continue
-                            }
+                    if (enabled != null) {
+                        if (name == "emulator_default") {
+                            emulatorDefault = enabled
+                            continue
+                        } else if (name == "device_default") {
+                            deviceDefault = enabled
+                            continue
                         }
 
-                        enabled = enabled ?: getDefaultForDevice(name)
-
-                        if (!enabled) continue
-
-                        val pushPath = jsonObj.getAsJsonPrimitive("pushPath")?.asString
-                        if (pushPath != null && pushPath != config.defaultPath) {
-                            customPaths[name] = pushPath
+                        if (enabled != getDefaultForDevice(name)) {
+                            customState[name] = enabled
+                            if (!enabled) continue
                         }
+                    }
+
+                    enabled = enabled ?: getDefaultForDevice(name)
+
+                    if (!enabled) continue
+
+                    val pushPath = jsonObj.getAsJsonPrimitive("pushPath")?.asString
+                    if (pushPath != null && pushPath != config.defaultPath) {
+                        customPaths[name] = pushPath
                     }
                 }
             }
 
-            val devs = connection.devices.mapNotNull{ device ->
+
+            val devs = connection.devices.mapNotNull { device ->
                 val name = device.serial
                 if (device.state != JadbDevice.State.Device)
                     return@mapNotNull null
