@@ -11,14 +11,13 @@ import java.io.File
  */
 @Suppress("MemberVisibilityCanBePrivate")
 open class PackCompilerPluginExtension {
-    var attributes: Map<String, Any>? = null
+    var attributes: ((String) -> Map<String, Any>)? = null
     var getJarName: ((Map<String, Any>) -> String)? = null
     var adbPush: Closure<AdbPushConfigExtension>? = null
 
-    val config
-        get() =
+    fun buildConfig(buildType: String) =
             PackCompilerPluginConfig(
-                attributes ?: throw IllegalStateException("Non-Nullable 'attributes' field was null"),
+                (attributes ?: throw IllegalStateException("Non-Nullable 'attributes' field was null"))(buildType),
                 getJarName ?: throw IllegalStateException("Non-Nullable 'getJarName' field was null"),
                 adbPush?.let {
                     AdbPushConfigExtension().run {

@@ -70,7 +70,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
 
         File(buildDir, dexDir).listFiles()?.forEach {
             if (it.name matches CLASSES_DEX_REGEX)
-                t.from(it.absolutePath)
+                t.from(it)
         }
     }
 

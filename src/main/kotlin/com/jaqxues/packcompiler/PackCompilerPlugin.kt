@@ -21,8 +21,8 @@ class PackCompilerPlugin : Plugin<Project> {
         val androidExtension = AndroidExtensionWrapper(appProject.extensions.getByName("android"))
 
         project.afterEvaluate {
-            val conf = extension.config
             for (buildType in androidExtension.buildTypes) {
+                val conf = extension.buildConfig(buildType)
                 val buildTypeCap = buildType.capitalize()
                 check(project.tasks.findByName("assemble$buildTypeCap") != null) {
                     "Specified Build Type is not associated with an 'assemble' task! ('$buildType' - 'assemble$buildTypeCap')"
