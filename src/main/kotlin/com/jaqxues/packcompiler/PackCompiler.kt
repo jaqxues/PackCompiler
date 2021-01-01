@@ -22,7 +22,7 @@ private const val DEX_DIR = BUILD_PATH + "dexes/"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
 private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
-private val CLASSES_DEX_REGEX = "classes\\d*\\.dex".toRegex()
+private val CLASSES_DEX_REGEX = "^classes\\d*\\.dex$".toRegex()
 
 class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, project: Project) {
     private val buildDir = project.buildDir
