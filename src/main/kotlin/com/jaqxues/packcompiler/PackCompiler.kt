@@ -3,7 +3,6 @@ package com.jaqxues.packcompiler
 import com.google.gson.JsonParser
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.api.file.FileCollection
 import org.gradle.jvm.tasks.Jar
 import se.vidstige.jadb.JadbConnection
 import se.vidstige.jadb.JadbDevice
@@ -22,7 +21,7 @@ private const val DEX_DIR = BUILD_PATH + "dexes/"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
 private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
-private val CLASSES_DEX_REGEX = "^classes\\d*\\.dex$".toRegex()
+private val CLASSES_DEX_REGEX = """^classes\d*\.dex$""".toRegex()
 
 class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, project: Project) {
     private val buildDir = project.buildDir
@@ -42,6 +41,13 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         t.doLast {
             val apkFile = File(buildDir, packApkPath)
             check(apkFile.exists()) { "Pack File does not exist, cannot extract .dex file(s) ('${apkFile.absolutePath}')" }
+
+            // Delete previous dex files
+            File(buildDir, dexDir).listFiles { _, name ->
+                name matches CLASSES_DEX_REGEX
+            }?.forEach {
+                it.delete()
+            }
 
             ZipInputStream(apkFile.inputStream()).use { zipInStream ->
                 var found = false
@@ -68,9 +74,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         // Remove ".jar" since this is added by the task itself
         t.archiveBaseName.set(unsignedJarFile.absolutePath.dropLast(4))
 
-        File(buildDir, dexDir).listFiles()?.forEach {
-            if (it.name matches CLASSES_DEX_REGEX)
-                t.from(it)
+        t.from(File(buildDir, dexDir)) {
+            it.include { el -> el.name matches CLASSES_DEX_REGEX }
         }
     }
 
