@@ -20,7 +20,8 @@ private const val BUILD_PATH = "pack_compiler/%s/"
 private const val DEX_DIR = BUILD_PATH + "dexes/"
 private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 
-private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
+//private const val PACK_APK = "outputs/apk/%1\$s/%2\$s-%1\$s.apk"
+private const val PACK_APK = "intermediates/apk/%1\$s/%2\$s-%1\$s.apk"
 private val CLASSES_DEX_REGEX = """^classes\d*\.dex$""".toRegex()
 
 class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, project: Project) {
@@ -194,6 +195,7 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
             for (name in devs) println("\t* $name")
         }
     }
+
 
     private fun generateAdbConfig(file: File, rootDir: File) {
         val parent = file.parentFile

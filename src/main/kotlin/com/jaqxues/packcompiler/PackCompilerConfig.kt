@@ -14,11 +14,13 @@ open class PackCompilerPluginExtension {
     var attributes: ((String) -> Map<String, Any>)? = null
     var getJarName: ((Map<String, Any>) -> String)? = null
     var adbPush: Closure<AdbPushConfigExtension>? = null
+    var assembleTaskLenient = false
 
     fun buildConfig(buildType: String) =
             PackCompilerPluginConfig(
                 (attributes ?: throw IllegalStateException("Non-Nullable 'attributes' field was null"))(buildType),
                 getJarName ?: throw IllegalStateException("Non-Nullable 'getJarName' field was null"),
+                assembleTaskLenient,
                 adbPush?.let {
                     AdbPushConfigExtension().run {
                         ConfigureUtil.configure(it, this)
@@ -46,10 +48,11 @@ open class AdbPushConfigExtension {
 data class PackCompilerPluginConfig(
     val attributes: Map<String, Any>,
     val jarName: String,
+    val assembleTaskLenient: Boolean,
     val adbPushConfig: AdbPushConfig?
 ) {
-    constructor(attributes: Map<String, Any>, getJarName: (Map<String, Any>) -> String, adbPushConfig: AdbPushConfig?)
-            : this(attributes, getJarName(attributes), adbPushConfig)
+    constructor(attributes: Map<String, Any>, getJarName: (Map<String, Any>) -> String, assembleTaskLenient: Boolean, adbPushConfig: AdbPushConfig?)
+            : this(attributes, getJarName(attributes), assembleTaskLenient, adbPushConfig)
 }
 
 data class AdbPushConfig(
