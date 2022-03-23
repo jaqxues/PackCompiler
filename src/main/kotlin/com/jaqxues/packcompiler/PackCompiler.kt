@@ -24,7 +24,7 @@ private const val JAR_TARGET_PATH = "outputs/pack/%s/"
 private const val PACK_APK = "intermediates/apk/%1\$s/%2\$s-%1\$s.apk"
 private val CLASSES_DEX_REGEX = """^classes\d*\.dex$""".toRegex()
 
-class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, project: Project) {
+class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String, private val project: Project) {
     private val buildDir = project.buildDir
     private val projectName = project.name
 
@@ -74,6 +74,8 @@ class PackCompiler(private val conf: PackCompilerPluginConfig, buildType: String
         }
         // Remove ".jar" since this is added by the task itself
         t.archiveBaseName.set(unsignedJarFile.absolutePath.dropLast(4))
+
+        t.from(File(project.projectDir, "src/main/resources"))
 
         t.from(File(buildDir, dexDir)) {
             it.include { el -> el.name matches CLASSES_DEX_REGEX }

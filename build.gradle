@@ -7,7 +7,7 @@ plugins {
 }
 
 group 'com.jaqxues'
-version '0.0.6.9'
+version '0.0.7.0'
 
 repositories {
     mavenCentral()
